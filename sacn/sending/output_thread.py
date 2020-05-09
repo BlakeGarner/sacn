@@ -94,8 +94,8 @@ class OutputThread(threading.Thread):
         packets = UniverseDiscoveryPacket.make_multiple_uni_disc_packets(
             cid=self.__CID, sourceName=self._sourceName, universes=list(self._outputs.keys()))
         for packet in packets:
-            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            self.send_packet(packet=packet, destination="<broadcast>")
+            self._socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 8)
+            self.send_packet(packet=packet, destination="239.255.250.214")
 
     def send_packet(self, packet, destination: str):
         MESSAGE = bytearray(packet.getBytes())
