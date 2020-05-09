@@ -153,11 +153,13 @@ class DataPacket(RootLayer):
         tmpPacket = DataPacket(cid=raw_data[22:38], sourceName=str(raw_data[44:108]),
                                universe=(0xFF * raw_data[113]) + raw_data[114])  # high byte first
         tmpPacket.priority = raw_data[108]
+        # TODO: Shouldn't the below should be 0x100 * raw_data[109] (or raw_data[109] << 256)?
         tmpPacket.syncAddr = (0xFF * raw_data[109]) + raw_data[110]  # high byte first
         tmpPacket.sequence = raw_data[111]
         tmpPacket.option_PreviewData = bool(raw_data[112] & 0b10000000)  # use the 7th bit as preview_data
         tmpPacket.option_StreamTerminated = bool(raw_data[112] & 0b01000000)  # use bit 6 as stream terminated
         tmpPacket.option_ForceSync = bool(raw_data[112] & 0b00100000)  # use bit 5 as force sync
+        # TODO: Check START code on DMX Data.
         tmpPacket.dmxData = raw_data[126:638]
         return tmpPacket
 
