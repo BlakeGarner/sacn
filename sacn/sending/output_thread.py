@@ -5,6 +5,7 @@ import socket
 import time
 import logging
 
+import sacn.config
 from sacn.sending.output import Output
 from sacn.messages.universe_discovery import UniverseDiscoveryPacket
 from sacn.messages.sync_packet import SyncPacket
@@ -76,14 +77,22 @@ class OutputThread(threading.Thread):
 
     def send_out(self, output: Output):
         # 1st: Destination (check if multicast)
+
         if output.multicast:
             udp_ip = output._packet.calculate_multicast_addr()
             # make socket multicast-aware: (set TTL)
             self._socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, output.ttl)
         else:
             udp_ip = output.destination
+        # hook to flip the force sync flag when we want to...
+        if sacn.config.force_sync_enable:
+            old_sync_setting = output._packet.option_ForceSync
+            output._packet.option_ForceSync = True
+            self.send_packet(output._packet, udp_ip)
+            output._packet.option_ForceSync = False
+        else:
+            self.send_packet(output._packet, udp_ip)
 
-        self.send_packet(output._packet, udp_ip)
         output._last_time_send = time.time()
         # increase the sequence counter
         output._packet.sequence_increase()
@@ -118,9 +127,10 @@ class OutputThread(threading.Thread):
             output._packet.syncAddr = sync_universe  # temporarily set the sync universe
             self.send_out(output)
             output._packet.syncAddr = 0
-        sync_packet = SyncPacket(cid=self.__CID, syncAddr=sync_universe, sequence=self._sync_sequence)
-        # Increment sequence number for next time.
-        self._sync_sequence += 1
-        if self._sync_sequence > 255:
-            self._sync_sequence = 0
-        self.send_packet(sync_packet, calculate_multicast_addr(sync_universe))
+        if not sacn.config.skip_sync_packet:  # Allow glitches to skip the sync packet.
+            sync_packet = SyncPacket(cid=self.__CID, syncAddr=sync_universe, sequence=self._sync_sequence)
+            # Increment sequence number for next time.
+            self._sync_sequence += 1
+            if self._sync_sequence > 255:
+                self._sync_sequence = 0
+            self.send_packet(sync_packet, calculate_multicast_addr(sync_universe))
