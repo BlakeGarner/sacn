@@ -12,6 +12,7 @@ from sacn.messages.root_layer import VECTOR_DMP_SET_PROPERTY, \
     make_flagsandlength
 import sacn.config
 
+
 class DataPacket(RootLayer):
     def __init__(self, cid: tuple, sourceName: str, universe: int, dmxData: tuple = (), priority: int = 100,
                  sequence: int = 0, streamTerminated: bool = False, previewData: bool = False,
@@ -138,7 +139,20 @@ class DataPacket(RootLayer):
             rtrnList.append(sacn.config.change_dmx_start)
         else:
             rtrnList.append(0x00)  # DMX Start Code
-        rtrnList.extend(self._dmxData)
+
+        # Reduce DMX slot size hook.
+        if sacn.config.limit_dmx_slot_size is not None and \
+                sacn.config.limit_dmx_slot_size < 512 and \
+                sacn.config.limit_dmx_slot_size >= 0:
+            for strt_addr in (16, 38, 115, 123):
+                old_length = ((rtrnList[strt_addr] & 0x0F) << 8) + rtrnList[strt_addr + 1]
+                old_flags = (rtrnList[strt_addr] & 0xF0)
+                new_length = old_length - (512 - sacn.config.limit_dmx_slot_size)
+                rtrnList[strt_addr] = old_flags + ((new_length >> 8) & 0x0F)
+                rtrnList[strt_addr + 1] = new_length & 0xFF
+            rtrnList.extend(self._dmxData[0:sacn.config.limit_dmx_slot_size])
+        else:
+            rtrnList.extend(self._dmxData)
 
         # Hooks to corrupt various parts of the data packet.
         if sacn.config.corrupt_root_preamble_data:

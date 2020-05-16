@@ -19,3 +19,4 @@ corrupt_framing_vector_sync = False
 change_dmx_start = None
 offset_data_seq_num = 0
 offset_sync_seq_num = 0
+limit_dmx_slot_size = 512
