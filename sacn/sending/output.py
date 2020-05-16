@@ -7,10 +7,10 @@ class Output:
     """
     This class is a compact representation of an sending with all relevant information
     """
-    def __init__(self, packet: DataPacket, last_time_send: int = 0, destination: str = "127.0.0.1",
+    def __init__(self, packet: DataPacket, last_time_send: float = 0, destination: str = "127.0.0.1",
                  multicast: bool = False, ttl: int = 8):
         self._packet: DataPacket = packet
-        self._last_time_send: int = last_time_send
+        self._last_time_send: float = last_time_send
         self.destination: str = destination
         self.multicast: bool = multicast
         self.ttl: int = ttl

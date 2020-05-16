@@ -4,11 +4,13 @@
 This implements the sync packet from the E1.31 standard.
 Information about sACN: http://tsp.esta.org/tsp/documents/docs/E1-31-2016.pdf
 """
+import sacn.config
 from sacn.messages.root_layer import VECTOR_ROOT_E131_EXTENDED, \
     VECTOR_E131_EXTENDED_SYNCHRONIZATION, \
     RootLayer, \
     int_to_bytes, \
     make_flagsandlength
+
 
 class SyncPacket(RootLayer):
     def __init__(self, cid: tuple, syncAddr: int, sequence: int = 0):
@@ -40,12 +42,25 @@ class SyncPacket(RootLayer):
 
     def getBytes(self) -> tuple:
         rtrnList = super().getBytes()
+        if sacn.config.corrupt_acn_sync_pid:
+            rtrnList[9] = 0x00
         rtrnList.extend(make_flagsandlength(self.length - 38))
         rtrnList.extend(VECTOR_E131_EXTENDED_SYNCHRONIZATION)
-        rtrnList.append(self._sequence)
-        rtrnList.extend(int_to_bytes(self._syncAddr))
+
+        seqNum = (self._sequence + sacn.config.offset_sync_seq_num) % 256
+        rtrnList.append(seqNum)
+        # Hook to offset sync address if desired.
+        rtrnList.extend(int_to_bytes(self._syncAddr + sacn.config.offset_sync_packet_universe_num))
         rtrnList.extend((0, 0))  # the empty reserved slots
-        return rtrnList
+
+        # Hooks to corrupt various parts of the sync packet.
+        if sacn.config.corrupt_root_preamble_sync:
+            rtrnList[1] = 0x01
+        if sacn.config.corrupt_root_vector_sync:
+            rtrnList[21] = 0x10
+        if sacn.config.corrupt_framing_vector_sync:
+            rtrnList[42] = 0x11
+        return tuple(rtrnList)
 
     @staticmethod
     def make_sync_packet(raw_data) -> 'SyncPacket':

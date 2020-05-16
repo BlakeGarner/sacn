@@ -27,7 +27,7 @@ class OutputThread(threading.Thread):
         self.enabled_flag: bool = True
         self.fps: int = fps
         self._bind_port = bind_port
-        self._socket: socket.socket = None
+        self._socket: socket.socket
         self.universeDiscovery: bool = universe_discovery
         self.manual_flush: bool = False
         self.logger = logging.getLogger('sacn')
@@ -120,7 +120,12 @@ class OutputThread(threading.Thread):
         This uses the E1.31 sync mechanism to try to sync all universes.
         Note that not all receivers support this feature.
         """
-        sync_universe = 63999  # currently hardcoded
+        if sacn.config.override_sync_address is not None and \
+                sacn.config.override_sync_address > 0 and \
+                sacn.config.override_sync_address <= 63999:
+            sync_universe = sacn.config.override_sync_address
+        else:
+            sync_universe = 63999  # currently hardcoded
         # go through the list of outputs and send everything out
         # Note: dict may changes size during iteration (multithreading)
         for output in list(self._outputs.values()):
@@ -133,4 +138,9 @@ class OutputThread(threading.Thread):
             self._sync_sequence += 1
             if self._sync_sequence > 255:
                 self._sync_sequence = 0
-            self.send_packet(sync_packet, calculate_multicast_addr(sync_universe))
+            if sacn.config.override_sync_packet_dst is None:
+                self.send_packet(sync_packet, 
+                                 calculate_multicast_addr(sync_universe))
+            else:
+                self.send_packet(sync_packet, 
+                                 sacn.config.override_sync_packet_dst)

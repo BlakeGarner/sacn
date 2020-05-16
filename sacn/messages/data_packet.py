@@ -10,7 +10,7 @@ from sacn.messages.root_layer import VECTOR_DMP_SET_PROPERTY, \
     RootLayer, \
     int_to_bytes, \
     make_flagsandlength
-
+import sacn.config
 
 class DataPacket(RootLayer):
     def __init__(self, cid: tuple, sourceName: str, universe: int, dmxData: tuple = (), priority: int = 100,
@@ -81,7 +81,7 @@ class DataPacket(RootLayer):
         """
         For legacy devices and to prevent errors, the length of the DMX data is normalized to 512
         """
-        newData = [0]*512
+        newData = [0] * 512
         for i in range(0, min(len(data), 512)):
             newData[i] = data[i]
         self._dmxData = tuple(newData)
@@ -105,7 +105,8 @@ class DataPacket(RootLayer):
         # syncAddress---------------------------
         rtrnList.extend(int_to_bytes(self._syncAddr))
         # sequence------------------------------
-        rtrnList.append(self._sequence)
+        seqNum = (self._sequence + sacn.config.offset_data_seq_num) % 256
+        rtrnList.append(seqNum)
         # Options Flags:------------------------
         tmpOptionsFlags = 0
         # stream terminated:
@@ -116,7 +117,12 @@ class DataPacket(RootLayer):
         tmpOptionsFlags += int(self.option_ForceSync) << 5
         rtrnList.append(tmpOptionsFlags)
         # universe:-----------------------------
-        rtrnList.extend(int_to_bytes(self._universe))
+        if sacn.config.switch_univ_one_and_two and self._universe == 1:
+            rtrnList.extend(int_to_bytes(2))
+        elif sacn.config.switch_univ_one_and_two and self._universe == 2:
+            rtrnList.extend(int_to_bytes(1))
+        else:
+            rtrnList.extend(int_to_bytes(self._universe))
         # DMP Layer:---------------------------------------------------
         # Flags and Length DMP Layer:-----------
         rtrnList.extend(make_flagsandlength(self.length - 115))
@@ -125,11 +131,24 @@ class DataPacket(RootLayer):
         # Some static values (Address & Data Type, First Property addr, ...)
         rtrnList.extend([0xa1, 0x00, 0x00, 0x00, 0x01])
         # Length of the data:-------------------
-        lengthDmxData = len(self._dmxData)+1
+        lengthDmxData = len(self._dmxData) + 1
         rtrnList.extend(int_to_bytes(lengthDmxData))
         # DMX data:-----------------------------
-        rtrnList.append(0x00)  # DMX Start Code
+        if sacn.config.change_dmx_start is not None:
+            rtrnList.append(sacn.config.change_dmx_start)
+        else:
+            rtrnList.append(0x00)  # DMX Start Code
         rtrnList.extend(self._dmxData)
+
+        # Hooks to corrupt various parts of the data packet.
+        if sacn.config.corrupt_root_preamble_data:
+            rtrnList[0] = 0x01
+        if sacn.config.corrupt_root_vector_data:
+            rtrnList[18] = 0x04
+        if sacn.config.corrupt_framing_vector_data:
+            rtrnList[43] = 0x03
+        if sacn.config.corrupt_dmp_vector_data:
+            rtrnList[117] = 0x03
 
         return tuple(rtrnList)
 
