@@ -123,7 +123,7 @@ class DataPacket(RootLayer):
         elif sacn.config.switch_univ_one_and_two and self._universe == 2:
             rtrnList.extend(int_to_bytes(1))
         else:
-            rtrnList.extend(int_to_bytes(self._universe))
+            rtrnList.extend(int_to_bytes(self._universe + sacn.config.offset_data_packet_universe_num))
         # DMP Layer:---------------------------------------------------
         # Flags and Length DMP Layer:-----------
         rtrnList.extend(make_flagsandlength(self.length - 115))
